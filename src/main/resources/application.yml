@@ -1,0 +1,68 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: API-GATEWAY
+  #output.ansi.enabled: ALWAYS
+  cloud:
+    gateway:
+      routes:
+        - id: STORE-SERVICE
+          uri: lb://STORE-SERVICE
+          predicates: 
+            - Path=/store/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: STORE-SERVICE
+                fallbackUri: forward:/storeFallback
+            #- CircuitBreaker=STORE-SERVICE
+            #- RewritePath=/store/save, /store/{store_id}, /storeFallback
+        - id: CATALOG-SERVICE
+          uri: lb://CATALOG-SERVICE
+          predicates: 
+            - Path=/catalog/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: CATALOG-SERVICE
+                fallbackUri: forward:/catalogFallback
+            #- CircuitBreaker=CATALOG-SERVICE
+            #- RewritePath=/catalog/save, /catalog/{catalog_id}, /catalogFallback
+
+logging.level.io.github.resilience4j: DEBUG
+
+resilience4j.circuitbreaker:
+  configs:
+    default:
+      slidingWindowSize: 10
+      minimumNumberOfCalls: 5
+      permittedNumberOfCallsInHalfOpenState: 3
+      automaticTransitionFromOpenToHalfOpenEnabled: true
+      waitDurationInOpenState: 2s
+      failureRateThreshold: 5
+      eventConsumerBufferSize: 10
+      
+  instances:
+    STORE-SERVICE:
+      baseConfig: default
+    CATALOG-SERVICE:
+      slidingWindowSize: 10
+      minimumNumberOfCalls: 10
+      permittedNumberOfCallsInHalfOpenState: 3
+      waitDurationInOpenState: 1s
+      failureRateThreshold: 50
+      eventConsumerBufferSize: 10
+
+resilience4j.timelimiter:
+  time-limiter-aspect-order: 398
+  configs:
+    default:
+      timeoutDuration: 1s
+      cancelRunningFuture: false
+  instances:
+    STORE-SERVICE:
+      timeoutDuration: 2s
+    CATALOG-SERVICE:
+      timeoutDuration: 2s
